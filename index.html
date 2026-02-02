@@ -780,6 +780,7 @@
         "Cette application présente un catéchisme de façon claire et accessible, avec une navigation simple, des favoris et des options de lecture.",
         "Vous pouvez basculer entre la vue question et la vue liste, afficher ou masquer les réponses par défaut, activer le mode sombre, masquer les flèches de navigation et ajuster la taille du texte.",
         "Les données sont enregistrées localement dans votre navigateur (réglages et favoris).",
+        "Sur ordinateur, vous pouvez utiliser les touches suivantes : L pour la vue liste, Q pour la vue question, Espace pour afficher ou masquer les réponses, S pour une question aléatoire, F pour ajouter ou retirer des favoris.",
         "Fabriqué avec ❤️ par KeachLabs."
       ]
     };
@@ -1172,6 +1173,16 @@
           toggle(els.toggleListView, false);
           saveState();
           showView("question");
+          e.preventDefault();
+          return;
+        }
+        if((e.key === "s" || e.key === "S") && els.questionView.classList.contains("active")){
+          els.shuffleBtn.click();
+          e.preventDefault();
+          return;
+        }
+        if((e.key === "f" || e.key === "F") && els.questionView.classList.contains("active")){
+          els.bookmarkBtn.click();
           e.preventDefault();
           return;
         }

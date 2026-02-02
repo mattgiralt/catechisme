@@ -1147,11 +1147,55 @@
     }
 
     document.addEventListener("keydown", e => {
+      const menuOpen = els.menuSheet.classList.contains("show");
+      const isDesktop = window.matchMedia("(min-width: 768px)").matches;
+      const inInput = e.target.closest("input") || e.target.closest("textarea") || e.target.closest("[contenteditable]");
+
       if(e.key === "Escape"){
-        if(els.menuSheet.classList.contains("show")){ closeMenu(); e.preventDefault(); }
+        if(menuOpen){ closeMenu(); e.preventDefault(); }
         return;
       }
-      if(els.questionView.classList.contains("active") && !els.menuSheet.classList.contains("show")){
+
+      /* Raccourcis desktop: L = vue liste, Q = vue question, Espace = afficher/masquer réponses */
+      if(isDesktop && !menuOpen && !inInput){
+        if(e.key === "l" || e.key === "L"){
+          state.listView = true;
+          toggle(els.toggleListView, true);
+          saveState();
+          renderList();
+          showView("list");
+          e.preventDefault();
+          return;
+        }
+        if(e.key === "q" || e.key === "Q"){
+          state.listView = false;
+          toggle(els.toggleListView, false);
+          saveState();
+          showView("question");
+          e.preventDefault();
+          return;
+        }
+        if(e.key === " "){
+          if(!e.target.closest("button")){
+            if(els.questionView.classList.contains("active")){
+              state.showAnswer = !state.showAnswer;
+              toggle(els.toggleAnswersOn, state.showAnswer);
+              saveState();
+              renderQuestion();
+              e.preventDefault();
+            }else if(els.listView.classList.contains("active")){
+              state.showAnswer = !state.showAnswer;
+              toggle(els.toggleAnswersOn, state.showAnswer);
+              saveState();
+              renderList();
+              e.preventDefault();
+            }
+          }
+          return;
+        }
+      }
+
+      if(els.questionView.classList.contains("active") && !menuOpen){
         if(e.key === "ArrowLeft"){ els.prevBtn.click(); e.preventDefault(); }
         else if(e.key === "ArrowRight"){ els.nextBtn.click(); e.preventDefault(); }
       }

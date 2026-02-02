@@ -540,7 +540,7 @@
         <div class="content-card" id="aboutContent"></div>
       </section>
 
-      <section id="bookmarksView" class="view" aria-label="Signets">
+      <section id="bookmarksView" class="view" aria-label="Favoris">
         <div class="content-card">
           <div class="list" id="bookmarksList"></div>
         </div>
@@ -612,7 +612,7 @@
         <div class="menu-list">
           <button class="menu-item" id="goCatechism">Le catéchisme<small>Origine et contexte</small></button>
           <button class="menu-item" id="goAbout">À propos<small>Informations sur l’app</small></button>
-          <button class="menu-item" id="goBookmarks">Signets<small>Questions en favoris</small></button>
+          <button class="menu-item" id="goBookmarks">Favoris<small>Questions en favoris</small></button>
         </div>
         <div style="margin-top:12px; color:var(--muted); font-size:12px; font-weight:700;">
           Version <span id="versionLabel">1.0.0</span>
@@ -780,7 +780,7 @@
         "Cette application présente un catéchisme de façon claire et accessible, avec une navigation simple, des favoris et des options de lecture.",
         "Vous pouvez basculer entre la vue question et la vue liste, afficher ou masquer les réponses par défaut, activer le mode sombre, masquer les flèches de navigation et ajuster la taille du texte.",
         "Les données sont enregistrées localement dans votre navigateur (réglages et favoris).",
-        "Sur ordinateur, vous pouvez utiliser les touches suivantes : L pour la vue liste, Q pour la vue question, Espace pour afficher ou masquer les réponses, S pour une question aléatoire, F pour ajouter ou retirer des favoris.",
+        "Sur ordinateur, vous pouvez utiliser les touches suivantes : V pour basculer entre vue question et vue liste, Espace pour afficher ou masquer les réponses, S pour une question aléatoire, F pour ajouter ou retirer des favoris.",
         "Fabriqué avec ❤️ par KeachLabs."
       ]
     };
@@ -901,7 +901,7 @@
       if(name === "settings") els.settingsBackdrop.classList.add("show");
       else els.settingsBackdrop.classList.remove("show");
 
-      const titleMap = { question: "Question", list: "Vue liste", catechism: "Le catéchisme", about: "À propos", bookmarks: "Signets", settings: "Réglages" };
+      const titleMap = { question: "Question", list: "Vue liste", catechism: "Le catéchisme", about: "À propos", bookmarks: "Favoris", settings: "Réglages" };
       els.headerTitle.textContent = titleMap[name] || "Question";
 
       const showBack = (name === "catechism" || name === "about" || name === "bookmarks" || name === "settings");
@@ -1157,22 +1157,18 @@
         return;
       }
 
-      /* Raccourcis desktop: L = vue liste, Q = vue question, Espace = afficher/masquer réponses */
+      /* Raccourcis desktop: V = bascule vue question/liste, Espace = afficher/masquer réponses */
       if(isDesktop && !menuOpen && !inInput){
-        if(e.key === "l" || e.key === "L"){
-          state.listView = true;
-          toggle(els.toggleListView, true);
+        if(e.key === "v" || e.key === "V"){
+          state.listView = !state.listView;
+          toggle(els.toggleListView, state.listView);
           saveState();
-          renderList();
-          showView("list");
-          e.preventDefault();
-          return;
-        }
-        if(e.key === "q" || e.key === "Q"){
-          state.listView = false;
-          toggle(els.toggleListView, false);
-          saveState();
-          showView("question");
+          if(state.listView){
+            renderList();
+            showView("list");
+          }else{
+            showView("question");
+          }
           e.preventDefault();
           return;
         }

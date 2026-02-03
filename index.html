@@ -175,7 +175,7 @@
       line-height:1.35;
       margin:0 0 32px;
       color:var(--fg);
-      transition:opacity .15s ease;
+      transition:opacity .2s ease;
     }
     .answer.hidden{ opacity:0; height:0; margin:0; overflow:hidden; }
 
@@ -196,6 +196,7 @@
       min-width:160px;
     }
     .pill-btn:focus-visible{ outline:3px solid var(--focus); outline-offset:2px; }
+    .icon-btn:hover,.pill-btn:hover,.mini:hover,.nav .arrow:hover:not(:disabled){ opacity:.9; }
 
     .actions{
       display:flex;
@@ -263,9 +264,31 @@
       accent-color:var(--accent);
     }
 
+    .list-search-wrap{
+      position:sticky;
+      top:0;
+      z-index:2;
+      padding-bottom:12px;
+      margin-bottom:8px;
+      background:var(--bg);
+    }
+    .list-search{
+      width:100%;
+      padding:12px 16px;
+      font-size:16px;
+      border:1px solid var(--line);
+      border-radius:12px;
+      background:var(--card);
+      color:var(--fg);
+      -webkit-appearance:none;
+      appearance:none;
+    }
+    .list-search::placeholder{ color:var(--muted); }
+    .list-search:focus{ outline:2px solid var(--accent); outline-offset:2px; }
     .list{
       overflow:hidden;
     }
+    .list-item[data-hidden="true"]{ display:none; }
     .list-item{
       display:flex;
       flex-direction:column;
@@ -475,6 +498,7 @@
     }
     .reset-btn:hover{ color:var(--fg); border-color:var(--muted); }
     .reset-sub{ font-size:12px; font-weight:600; color:var(--muted); }
+    .sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 
     @media (min-width:768px){
       :root{
@@ -499,11 +523,14 @@
 
     <main>
       <div class="settings-backdrop" id="settingsBackdrop" aria-hidden="true"></div>
+      <!-- Annonce pour lecteurs d'écran (aria-live) -->
+      <div id="liveAnnouncer" aria-live="polite" aria-atomic="true" class="sr-only"></div>
+
       <section id="questionView" class="view active" aria-label="Question">
         <div class="question-wrap">
           <div class="center">
             <div class="qnum" id="qNum">QUESTION 1</div>
-            <h2 class="qtext" id="qText">Who made you?</h2>
+            <h2 class="qtext" id="qText" tabindex="-1">Who made you?</h2>
             <div class="divider" aria-hidden="true"></div>
 
             <p class="answer" id="aText">God.</p>
@@ -528,8 +555,12 @@
         </div>
       </section>
 
-      <section id="listView" class="view" aria-label="Liste">
-        <div class="list" id="listContainer"></div>
+      <section id="listView" class="view" aria-label="Liste des questions">
+        <div class="list-search-wrap">
+          <label for="listSearchInput" class="sr-only">Rechercher dans les questions</label>
+          <input type="search" id="listSearchInput" class="list-search" placeholder="Rechercher une question…" autocomplete="off" aria-label="Rechercher dans les questions" />
+        </div>
+        <div class="list" id="listContainer" role="list"></div>
       </section>
 
       <section id="catechismView" class="view" aria-label="Le catéchisme">
@@ -542,7 +573,7 @@
 
       <section id="bookmarksView" class="view" aria-label="Favoris">
         <div class="content-card">
-          <div class="list" id="bookmarksList"></div>
+          <div class="list" id="bookmarksList" role="list"></div>
         </div>
       </section>
 
@@ -622,6 +653,8 @@
   </div>
 
   <script>
+    /* Catéchisme — Auteur: KeachLabs
+       « La crainte de l'Éternel est le commencement de la sagesse; Tous ceux qui l'observent ont une raison saine. Sa gloire subsiste à jamais. » (Ps 111.10) */
     const APP_VERSION = "1.0.0";
 
     const QUESTIONS = [
@@ -781,14 +814,18 @@
         "Vous pouvez basculer entre la vue question et la vue liste, afficher ou masquer les réponses par défaut, activer le mode sombre, masquer les flèches de navigation et ajuster la taille du texte.",
         "Les données sont enregistrées localement dans votre navigateur (réglages et favoris).",
         "Sur ordinateur, vous pouvez utiliser les touches suivantes : V pour basculer entre vue question et vue liste, Espace pour afficher ou masquer les réponses, S pour une question aléatoire, F pour ajouter ou retirer des favoris.",
-        "Fabriqué avec ❤️ par KeachLabs."
+        "Fabriqué avec ❤️ par KeachLabs.",
+        "« La crainte de l'Éternel est le commencement de la sagesse; Tous ceux qui l'observent ont une raison saine. Sa gloire subsiste à jamais. » (Ps 111.10)"
       ]
     };
 
     const els = {
       headerTitle: document.getElementById("headerTitle"),
+      liveAnnouncer: document.getElementById("liveAnnouncer"),
       questionView: document.getElementById("questionView"),
       listView: document.getElementById("listView"),
+      listSearchInput: document.getElementById("listSearchInput"),
+      listContainer: document.getElementById("listContainer"),
       catechismView: document.getElementById("catechismView"),
       catechismContent: document.getElementById("catechismContent"),
       aboutView: document.getElementById("aboutView"),
@@ -803,7 +840,6 @@
       nextBtn: document.getElementById("nextBtn"),
       bookmarkBtn: document.getElementById("bookmarkBtn"),
       shuffleBtn: document.getElementById("shuffleBtn"),
-      listContainer: document.getElementById("listContainer"),
       bookmarksList: document.getElementById("bookmarksList"),
       aboutContent: document.getElementById("aboutContent"),
       menuBtn: document.getElementById("menuBtn"),
@@ -827,45 +863,62 @@
       resetDataBtn: document.getElementById("resetDataBtn"),
     };
 
-    const STORAGE_KEY = "catechism_app_state_v1";
+    const STORAGE_KEY = "catechism_app_state_v2";
 
-    function loadState(){
-      const base = {
-        currentIndex: 0,
-        showAnswer: true,
-        darkMode: false,
-        hideArrows: false,
-        listView: false,
-        fontSize: 32,
-        bookmarks: []
-      };
-      function systemDark(){ return typeof window !== "undefined" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches; }
-      try{
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if(!raw){
+    /* ——— État central (progression, favoris, préférences) ——— */
+    const App = {
+      State: null,
+      loadState(){
+        const base = {
+          currentIndex: 0,
+          showAnswer: true,
+          darkMode: false,
+          hideArrows: false,
+          listView: false,
+          fontSize: 32,
+          bookmarks: []
+        };
+        const systemDark = () => window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) { base.darkMode = systemDark(); App.State = base; return base; }
+          const parsed = JSON.parse(raw);
+          App.State = { ...base, ...parsed };
+          return App.State;
+        } catch {
           base.darkMode = systemDark();
+          App.State = base;
           return base;
         }
-        const parsed = JSON.parse(raw);
-        const out = { ...base, ...parsed };
-        return out;
-      }catch{
-        base.darkMode = systemDark();
-        return base;
-      }
-    }
+      },
+      saveState(){
+        clearTimeout(App._saveTimer);
+        App._saveTimer = setTimeout(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(App.State)); }, 200);
+      },
+      saveStateNow(){ clearTimeout(App._saveTimer); localStorage.setItem(STORAGE_KEY, JSON.stringify(App.State)); }
+    };
+    App.loadState();
+    const state = App.State;
 
-    const state = loadState();
-
-    let _saveStateTimer;
-    function saveState(){
-      clearTimeout(_saveStateTimer);
-      _saveStateTimer = setTimeout(function(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }, 200);
-    }
-    function saveStateNow(){ clearTimeout(_saveStateTimer); localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
     function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
     function escapeHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
     function getCurrentQuestion(){ return QUESTIONS[state.currentIndex] || QUESTIONS[0]; }
+
+    function viewTransition(callback){ callback(); }
+
+    /* ——— Feedback haptique (mobile) ——— */
+    function haptic(ms){ if (navigator.vibrate) navigator.vibrate(ms ?? 8); }
+
+    /* ——— Annonces lecteurs d'écran (a11y) ——— */
+    function announce(message){
+      const el = els.liveAnnouncer;
+      if (!el) return;
+      el.textContent = "";
+      requestAnimationFrame(() => { el.textContent = message; });
+    }
+
+    function saveState(){ App.saveState(); }
+    function saveStateNow(){ App.saveStateNow(); }
 
     function setTheme(){
       document.body.classList.toggle("theme-dark", !!state.darkMode);
@@ -885,8 +938,7 @@
 
     let _currentView = "";
     function showView(name){
-      if(_currentView === name) return;
-      _currentView = name;
+      if (_currentView === name) return;
       const map = {
         question: els.questionView,
         list: els.listView,
@@ -895,18 +947,18 @@
         bookmarks: els.bookmarksView,
         settings: els.settingsView
       };
-      for(const k in map) map[k].classList.remove("active");
-      map[name].classList.add("active");
-
-      if(name === "settings") els.settingsBackdrop.classList.add("show");
-      else els.settingsBackdrop.classList.remove("show");
-
-      const titleMap = { question: "Question", list: "Vue liste", catechism: "Le catéchisme", about: "À propos", bookmarks: "Favoris", settings: "Réglages" };
-      els.headerTitle.textContent = titleMap[name] || "Question";
-
-      const showBack = (name === "catechism" || name === "about" || name === "bookmarks" || name === "settings");
-      els.backBtn.style.display = showBack ? "" : "none";
-      els.settingsBtn.style.display = showBack ? "none" : "";
+      viewTransition(() => {
+        _currentView = name;
+        for (const k in map) map[k].classList.remove("active");
+        map[name].classList.add("active");
+        if (name === "settings") els.settingsBackdrop.classList.add("show");
+        else els.settingsBackdrop.classList.remove("show");
+        const titleMap = { question: "Question", list: "Vue liste", catechism: "Le catéchisme", about: "À propos", bookmarks: "Favoris", settings: "Réglages" };
+        els.headerTitle.textContent = titleMap[name] || "Question";
+        const showBack = (name === "catechism" || name === "about" || name === "bookmarks" || name === "settings");
+        els.backBtn.style.display = showBack ? "" : "none";
+        els.settingsBtn.style.display = showBack ? "none" : "";
+      });
     }
 
     function leaveSettings(){
@@ -921,14 +973,15 @@
 
     function renderQuestion(){
       const q = getCurrentQuestion();
-      els.qNum.textContent = "QUESTION " + (state.currentIndex + 1);
+      const num = state.currentIndex + 1;
+      els.qNum.textContent = "QUESTION " + num;
       els.qText.textContent = q.question;
       els.aText.textContent = q.answer;
 
-      if(state.showAnswer){
+      if (state.showAnswer) {
         els.aText.classList.remove("hidden");
         els.toggleAnswer.textContent = "Masquer la réponse";
-      }else{
+      } else {
         els.aText.classList.add("hidden");
         els.toggleAnswer.textContent = "Montrer la réponse";
       }
@@ -943,19 +996,26 @@
 
       els.prevBtn.disabled = state.currentIndex <= 0;
       els.nextBtn.disabled = state.currentIndex >= QUESTIONS.length - 1;
-
       els.prevBtn.style.display = state.hideArrows ? "none" : "";
       els.nextBtn.style.display = state.hideArrows ? "none" : "";
+
+      announce("Question " + num + " sur " + QUESTIONS.length + ". " + q.question);
     }
 
+    function getListSearchQuery(){ return (els.listSearchInput && els.listSearchInput.value) ? els.listSearchInput.value.trim().toLowerCase() : ""; }
+
     function renderList(){
+      const query = getListSearchQuery();
       const frag = document.createDocumentFragment();
-      for(let idx = 0; idx < QUESTIONS.length; idx++){
+      for (let idx = 0; idx < QUESTIONS.length; idx++) {
         const q = QUESTIONS[idx];
+        const match = !query || q.question.toLowerCase().includes(query) || q.answer.toLowerCase().includes(query);
         const row = document.createElement("div");
         row.className = "list-item";
-        if(state.showAnswer) row.classList.add("expanded");
+        row.setAttribute("role", "listitem");
         row.dataset.index = String(idx);
+        row.dataset.hidden = match ? "false" : "true";
+        if (state.showAnswer) row.classList.add("expanded");
         row.innerHTML = "<div class=\"list-item-row\"><div class=\"n\">" + (idx + 1) + "</div><div class=\"t\">" + q.question + "</div></div><div class=\"list-item-answer\">" + escapeHtml(q.answer) + "</div>";
         frag.appendChild(row);
       }
@@ -975,6 +1035,7 @@
         if(!bookmarksSet.has(QUESTIONS[i].id)) continue;
         const row = document.createElement("div");
         row.className = "list-item";
+        row.setAttribute("role", "listitem");
         row.dataset.index = String(i);
         row.innerHTML = "<div class=\"list-item-row\"><div class=\"n\">" + (i + 1) + "</div><div class=\"t\">" + QUESTIONS[i].question + "</div></div>";
         frag.appendChild(row);
@@ -1006,94 +1067,88 @@
       document.body.style.overflow = "";
     }
 
-    /* Events: lecture */
     els.toggleAnswer.addEventListener("click", () => {
+      haptic();
       state.showAnswer = !state.showAnswer;
       toggle(els.toggleAnswersOn, state.showAnswer);
       saveState();
       renderQuestion();
     });
 
+    /* Délégation d'événements sur le conteneur liste */
     els.listContainer.addEventListener("click", function(e){
       const row = e.target.closest(".list-item");
-      if(!row || row.classList.contains("list-item-empty")) return;
+      if (!row || row.classList.contains("list-item-empty") || row.dataset.hidden === "true") return;
       const idx = parseInt(row.dataset.index, 10);
-      if(isNaN(idx)) return;
+      if (isNaN(idx)) return;
+      haptic();
       const wasExpanded = row.classList.contains("expanded");
       const expanded = els.listContainer.querySelector(".list-item.expanded");
-      if(expanded) expanded.classList.remove("expanded");
-      if(!wasExpanded) row.classList.add("expanded");
+      if (expanded) expanded.classList.remove("expanded");
+      if (!wasExpanded) row.classList.add("expanded");
       state.currentIndex = idx;
       saveState();
     });
+
+    if (els.listSearchInput) {
+      els.listSearchInput.addEventListener("input", () => renderList());
+      els.listSearchInput.addEventListener("search", () => renderList());
+    }
 
     els.bookmarksList.addEventListener("click", function(e){
       const row = e.target.closest(".list-item");
-      if(!row || row.classList.contains("list-item-empty")) return;
+      if (!row || row.classList.contains("list-item-empty")) return;
       const idx = parseInt(row.dataset.index, 10);
-      if(isNaN(idx)) return;
+      if (isNaN(idx)) return;
+      haptic();
       state.currentIndex = idx;
       saveState();
-      renderQuestion();
-      showView("question");
+      viewTransition(() => { renderQuestion(); showView("question"); });
     });
 
-    els.prevBtn.addEventListener("click", () => {
-      state.currentIndex = clamp(state.currentIndex - 1, 0, QUESTIONS.length - 1);
+    function goQuestion(index){
+      state.currentIndex = clamp(index, 0, QUESTIONS.length - 1);
       saveState();
-      renderQuestion();
-    });
+      viewTransition(() => renderQuestion());
+    }
 
-    els.nextBtn.addEventListener("click", () => {
-      state.currentIndex = clamp(state.currentIndex + 1, 0, QUESTIONS.length - 1);
-      saveState();
-      renderQuestion();
-    });
+    els.prevBtn.addEventListener("click", () => { haptic(); goQuestion(state.currentIndex - 1); });
+    els.nextBtn.addEventListener("click", () => { haptic(); goQuestion(state.currentIndex + 1); });
 
     els.qSlider.addEventListener("input", e => {
-      state.currentIndex = clamp(Number(e.target.value), 0, QUESTIONS.length - 1);
-      saveState();
-      renderQuestion();
+      goQuestion(Number(e.target.value));
     });
 
     els.bookmarkBtn.addEventListener("click", () => {
+      haptic();
       const id = getCurrentQuestion().id;
       const i = state.bookmarks.indexOf(id);
-      if(i === -1) state.bookmarks.push(id);
+      if (i === -1) state.bookmarks.push(id);
       else state.bookmarks.splice(i, 1);
       saveState();
       renderQuestion();
     });
 
     els.shuffleBtn.addEventListener("click", () => {
-      if(QUESTIONS.length <= 1) return;
+      if (QUESTIONS.length <= 1) return;
+      haptic();
       let n;
-      do{ n = Math.floor(Math.random() * QUESTIONS.length); }
-      while(n === state.currentIndex);
-      state.currentIndex = n;
-      saveState();
-      renderQuestion();
+      do { n = Math.floor(Math.random() * QUESTIONS.length); } while (n === state.currentIndex);
+      goQuestion(n);
     });
 
     /* Menu */
-    els.menuBtn.addEventListener("click", openMenu);
-    els.closeMenuBtn.addEventListener("click", closeMenu);
+    els.menuBtn.addEventListener("click", () => { haptic(); openMenu(); });
+    els.closeMenuBtn.addEventListener("click", () => { haptic(); closeMenu(); });
     els.sheetBackdrop.addEventListener("click", closeMenu);
 
     els.goCatechism.addEventListener("click", () => { closeMenu(); renderCatechism(); showView("catechism"); });
     els.goAbout.addEventListener("click", () => { closeMenu(); renderAbout(); showView("about"); });
     els.goBookmarks.addEventListener("click", () => { closeMenu(); renderBookmarks(); showView("bookmarks"); });
 
-    els.backBtn.addEventListener("click", () => {
-      if(els.settingsView.classList.contains("active")) leaveSettings();
-      else showView("question");
-    });
+    els.backBtn.addEventListener("click", () => { haptic(); if (els.settingsView.classList.contains("active")) leaveSettings(); else showView("question"); });
 
-    /* Settings */
-    els.settingsBtn.addEventListener("click", () => {
-      if(els.settingsView.classList.contains("active")) leaveSettings();
-      else showView("settings");
-    });
+    els.settingsBtn.addEventListener("click", () => { haptic(); if (els.settingsView.classList.contains("active")) leaveSettings(); else showView("settings"); });
 
     els.settingsBackdrop.addEventListener("click", leaveSettings);
 
@@ -1233,19 +1288,23 @@
 
     function init(){
       els.versionLabel.textContent = APP_VERSION;
-
       toggle(els.toggleListView, state.listView);
       toggle(els.toggleAnswersOn, state.showAnswer);
       toggle(els.toggleDarkMode, state.darkMode);
       toggle(els.toggleHideArrows, state.hideArrows);
-
       setTheme();
       setFontSize();
       renderQuestion();
-      showView("question");
 
-      if("serviceWorker" in navigator){
-        navigator.serviceWorker.register("service-worker.js").catch(function(){});
+      if (state.listView) {
+        renderList();
+        showView("list");
+      } else {
+        showView("question");
+      }
+
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("service-worker.js").catch(() => {});
       }
     }
 

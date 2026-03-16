@@ -655,7 +655,7 @@
   <script>
     /* Catéchisme — Auteur: KeachLabs
        « La crainte de l'Éternel est le commencement de la sagesse; Tous ceux qui l'observent ont une raison saine. Sa gloire subsiste à jamais. » (Ps 111.10) */
-    const APP_VERSION = "1.0.1";
+    const APP_VERSION = "1.0.2";
 
     const QUESTIONS = [
   { id: 1, question: "Qui t’a créé ?", answer: "Dieu m’a créé." },
@@ -1042,7 +1042,7 @@
     }
 
     function renderCatechism(){
-      els.catechismContent.innerHTML = "<p>" + CATECHISM_TEXT + "</p>";
+      els.catechismContent.innerHTML = CATECHISM_TEXT.paragraphs.map(p => "<p>" + p + "</p>").join("");
     }
 
     function renderAbout(){
@@ -1206,7 +1206,12 @@
       const inInput = e.target.closest("input") || e.target.closest("textarea") || e.target.closest("[contenteditable]");
 
       if(e.key === "Escape"){
-        if(menuOpen){ closeMenu(); e.preventDefault(); }
+        if(menuOpen){ closeMenu(); e.preventDefault(); return; }
+        const onMenuPage = (_currentView === "catechism" || _currentView === "about" || _currentView === "bookmarks");
+        if(isDesktop && onMenuPage){
+          showView("question");
+          e.preventDefault();
+        }
         return;
       }
 
